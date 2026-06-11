@@ -1,7 +1,9 @@
 from fastapi import APIRouter, UploadFile, File, HTTPException
+from pydantic import BaseModel
 from loguru import logger
 from app.services.document_service import DocumentService
 from app.services.embedding_service import EmbeddingService
+from app.agents.react_agent import DocumentAgent
 from app.core.config import get_settings
 
 router = APIRouter()
@@ -10,6 +12,16 @@ settings = get_settings()
 # Initialize services
 document_service = DocumentService()
 embedding_service = EmbeddingService()
+agent = DocumentAgent()
+
+
+# ─────────────────────────────────────────
+# REQUEST MODELS
+# ─────────────────────────────────────────
+
+class QuestionRequest(BaseModel):
+    question: str
+    top_k: int = 5
 
 
 # ─────────────────────────────────────────
@@ -91,7 +103,8 @@ async def upload_document(
         "char_count": result.get("char_count"),
         "chunk_count": embed_result.get("chunk_count"),
         "message": (
-            f"Document processed and {embed_result.get('chunk_count')} "
+            f"Document processed and "
+            f"{embed_result.get('chunk_count')} "
             f"chunks stored in ChromaDB."
         ),
         "next_step": "Ready for Q&A"
@@ -103,12 +116,39 @@ async def upload_document(
 # ─────────────────────────────────────────
 
 @router.post("/ask-question")
-async def ask_question():
+async def ask_question(request: QuestionRequest):
     """
     Ask a natural language question about uploaded documents.
-    Full RAG pipeline implementation coming next.
+    Uses ReActAgent with RAG pipeline to generate
+    grounded answers from your uploaded documents.
     """
+    logger.info(
+        f"Question received: '{request.question}'"
+    )
+
+    # Validate question not empty
+    if not request.question or not request.question.strip():
+        raise HTTPException(
+            status_code=400,
+            detail="Question cannot be empty."
+        )
+
+    # Run the ReActAgent
+    result = agent.ask(request.question)
+
+    if result.get("status") != "success":
+        raise HTTPException(
+            status_code=500,
+            detail=result.get("message")
+        )
+
+    logger.info(
+        f"Answer generated for: '{request.question}'"
+    )
+
     return {
-        "status": "endpoint ready",
-        "message": "Q&A functionality coming next"
+        "status": "success",
+        "question": result.get("question"),
+        "answer": result.get("answer"),
+        "message": result.get("message")
     }
