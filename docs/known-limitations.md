@@ -32,6 +32,26 @@ LLM, a re-ranking step after retrieval, or topic-aware chunk
 filtering — all of which add cost, complexity, or latency beyond 
 the scope of this capstone's free-tier constraints.
 
+**Confirmed through repeated testing:**
+The same question ("Which employee has the highest salary?") 
+was tested multiple times against an unchanged knowledge base. 
+Results were inconsistent:
+- Run 1: Correct answer (Raj Patel, Engineering, $92,000) — 
+  54.88 seconds response time
+- Run 2 (immediately after): Incorrect — "I could not find 
+  information" — 1.39 seconds response time
+
+Reviewing the full agent trace for Run 2 confirmed that 
+retrieval correctly returned the chunk containing the answer 
+as the FIRST of three retrieved chunks, immediately followed 
+by a longer, denser, topically unrelated chunk from a PDF 
+document. The LLM's final answer ignored the correct chunk 
+entirely. This is strong evidence the failure is a genuine 
+LLM attention limitation when relevant short content is 
+immediately followed by longer unrelated content — not a 
+retrieval bug, not a token limit issue, and not directly 
+correlated with response time.
+
 **Possible production improvements:**
 - Add a re-ranking step (e.g. cross-encoder) after initial 
   retrieval to prioritize the most relevant chunk
