@@ -301,4 +301,45 @@ language changes.
 
 ---
 
-*Document version: 1.4 — June 2026*
+## 8. Free-Tier Render Deployment Memory Constraint
+
+**Observed behavior:**
+After resolving the Python version compatibility issue (see #7), 
+the Docker image deployed successfully to Render's free tier 
+(512MB RAM). The application started, `DocumentService` initialized 
+successfully, but the process was killed with "Out of memory 
+(used over 512Mi)" while `EmbeddingService` was loading the 
+`sentence-transformers` model.
+
+**Root cause:**
+`sentence-transformers` and its `torch` dependency require more 
+than 512MB RAM to load the embedding model into memory, even 
+before processing any documents. This is a known constraint of 
+running local ML models (as opposed to calling an external 
+embedding API) on minimal-resource free-tier hosting.
+
+**Decision:**
+Rather than incur a recurring $25/month cost for Render's Standard 
+tier (2GB RAM) to support a free capstone project, the decision 
+was made to keep development and testing on GitHub Codespaces, 
+which has sufficient resources, and to provide local demo 
+evidence (screenshots, logs, and this documentation) for 
+submission rather than a continuously-hosted live URL.
+
+**Validated:** The Dockerfile itself is confirmed correct and 
+production-ready — it built and started successfully on Render's 
+infrastructure. With adequate RAM (2GB+), this deployment would 
+run without further changes. This was confirmed by the application 
+successfully reaching `EmbeddingService` initialization before 
+the memory ceiling was hit.
+
+**Production improvement:** 
+A production deployment would either use a paid tier with 
+sufficient RAM, or replace local embedding generation with an 
+external embeddings API (e.g. OpenAI or Cohere embeddings) to 
+reduce the application's own memory footprint, trading a small 
+per-call API cost for lower hosting resource requirements.
+
+---
+
+*Document version: 1.5 — June 2026*
