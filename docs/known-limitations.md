@@ -62,6 +62,40 @@ correlated with response time.
 - Tag documents by topic/category and filter retrieval by topic 
   when known
 
+**Follow-up experiment — does knowledge base size matter?**
+To test whether the issue was caused specifically by the large 
+12-chunk PDF, the experiment was repeated with a much smaller 
+knowledge base: travel_policy.txt (1 chunk), employees.csv 
+(1 chunk), and a short 4-page slide PDF (2 chunks) — 4 chunks 
+total, compared to 14 in the original test.
+
+The same question ("Which employee has the highest salary?") 
+was run 3 times consecutively:
+- Run 1: Correct (required additional ReAct iterations to 
+  complete — see max_iterations note below)
+- Run 2: Correct (completed cleanly)
+- Run 3: Incorrect — agent skipped calling the search tool 
+  entirely and answered "I could not find information" 
+  without attempting retrieval
+
+**Conclusion:** Knowledge base size and document length are 
+not the primary cause. Even with a small, focused knowledge 
+base, the LLM occasionally chose not to invoke the search tool 
+at all before answering. This indicates the core limitation is 
+inherent non-determinism in a small, fast LLM's decision of 
+*whether* to use a tool — not the volume or dilution of 
+retrieved context. Larger, more capable models are generally 
+more reliable at consistent tool-use decisions; this tradeoff 
+was accepted here in favor of free-tier speed and cost.
+
+**Related fix — increased max_iterations:**
+During this experiment, `max_iterations=5` was found to be too 
+restrictive in some cases — the agent reached a correct answer 
+in its reasoning but exceeded the iteration limit before 
+formally returning it, producing a `None` result. Increasing 
+`max_iterations` to `10` in `react_agent.py` resolved this 
+specific failure mode.
+
 ---
 
 ## 2. LLM Non-Determinism on Tabular Data
@@ -91,4 +125,31 @@ queries returned correct, consistent answers after this change).
 
 ---
 
-*Document version: 1.0 — June 2026*
+## 3. Stale ChromaDB Collection Reference After External Clear
+
+**Observed behavior:**
+Calling `clear_collection()` from a separate Python process while 
+the FastAPI server is already running can leave the running 
+server's `EmbeddingService` instance pointing to a stale, deleted 
+ChromaDB collection reference, causing subsequent uploads to fail 
+with an empty error message.
+
+**Root cause:**
+`EmbeddingService` and `RetrievalService` each hold their own 
+`self.collection` reference, set once at initialization. Clearing 
+the collection from outside the running server process does not 
+update that in-memory reference.
+
+**Fix:**
+Restart the FastAPI server (`main.py`) after externally clearing 
+ChromaDB, so services reinitialize against the current collection 
+state.
+
+**Production improvement:**
+Add an admin endpoint to clear the collection through the running 
+application itself (rather than a separate script), ensuring all 
+service instances stay in sync.
+
+---
+
+*Document version: 1.1 — June 2026*

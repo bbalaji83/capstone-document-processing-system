@@ -57,7 +57,7 @@ class DocumentAgent:
             tools=self.tools,
             llm=self.llm,
             verbose=True,
-            max_iterations=5,
+            max_iterations=10,
             context=self._get_system_prompt()
         )
         logger.info("ReActAgent initialized successfully")
