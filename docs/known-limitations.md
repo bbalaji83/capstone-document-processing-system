@@ -151,5 +151,81 @@ application itself (rather than a separate script), ensuring all
 service instances stay in sync.
 
 ---
+---
 
-*Document version: 1.1 — June 2026*
+## 4. Conversation History Causing Inconsistent Tool Use (Fixed)
+
+**Observed behavior:**
+When asking 3 questions in sequence using `agent.chat()`, the 
+first 1-2 questions were answered correctly (with the search 
+tool correctly invoked), but later questions in the same session 
+sometimes skipped the search tool entirely and answered 
+incorrectly with "I could not find information."
+
+**Root cause:**
+`agent.chat()` maintains conversation history across calls. As 
+context accumulated from previous questions, the LLM sometimes 
+assumed it already had enough information and skipped calling 
+the search tool for new, unrelated questions.
+
+**Fix applied:**
+Changed `self.agent.chat(question)` to `self.agent.query(question)` 
+in `react_agent.py`. `query()` treats each question as 
+independent with no retained conversation history, which matches 
+the intended use case — each API call to `/ask-question` should 
+be a fresh, independent question about the documents, not part 
+of an ongoing conversation. After this change, repeated testing 
+showed consistently correct tool use across multiple sequential 
+questions.
+
+---
+
+## 5. Occasional ReAct Output Format Parse Errors (Self-Healing)
+
+**Observed behavior:**
+After several tool calls in a single agent run, the LLM 
+occasionally produced output that didn't match LlamaIndex's 
+expected `Thought: / Action: / Answer:` format, triggering 
+"Error: Could not parse output" and an automatic retry.
+
+**Root cause:**
+`llama-3.1-8b-instant` is a small, fast model. Smaller models 
+are generally less reliable than larger ones at strictly 
+following structured prompting formats like ReAct, especially 
+after multiple reasoning steps.
+
+**Outcome:**
+LlamaIndex's built-in retry mechanism automatically reissued 
+the request on parse failure. In testing, this self-corrected 
+within 2-3 retries and ultimately produced the correct answer 
+every time observed, at the cost of additional latency 
+(up to ~90 seconds in one observed case).
+
+**Possible production improvement:**
+Use a larger, more format-reliable model (e.g. 
+`llama-3.3-70b-versatile`) to reduce parse-retry frequency and 
+latency, at the cost of slower/more expensive inference.
+
+---
+
+## Summary — Free-Tier Small-LLM Tradeoffs
+
+All limitations documented above (sections 1, 4, and 5) trace 
+back to the same underlying engineering tradeoff: this project 
+uses `llama-3.1-8b-instant`, a small and fast model available 
+on Groq's free tier, in order to keep the entire system free to 
+build and run. This model is occasionally inconsistent in:
+- Deciding whether to invoke the search tool (section 1)
+- Maintaining reliable tool-use behavior across a conversation 
+  (section 4, now fixed via `query()` instead of `chat()`)
+- Strictly following the ReAct structured output format 
+  (section 5, self-healing via automatic retry)
+
+A production deployment with budget for a larger model (e.g. 
+`llama-3.3-70b-versatile` or a paid-tier model) would likely 
+see meaningfully improved consistency across all three areas, 
+at increased cost and latency per request.
+
+---
+
+*Document version: 1.2 — June 2026*

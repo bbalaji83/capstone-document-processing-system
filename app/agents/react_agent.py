@@ -100,7 +100,7 @@ class DocumentAgent:
 
         try:
             # Run the ReAct agent
-            response = self.agent.chat(question)
+            response = self.agent.query(question)
             answer = str(response)
 
             logger.info(
