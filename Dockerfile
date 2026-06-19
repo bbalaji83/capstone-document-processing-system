@@ -1,7 +1,7 @@
 # ─────────────────────────────────────────
 # Base image — Python 3.12 slim version
 # ─────────────────────────────────────────
-FROM python:3.12-slim
+FROM python:3.12.3-slim
 
 # ─────────────────────────────────────────
 # Set working directory inside container

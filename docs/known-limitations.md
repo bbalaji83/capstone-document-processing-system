@@ -265,4 +265,40 @@ rather than a workaround.
 
 ---
 
-*Document version: 1.3 — June 2026*
+## 7. Python Patch Version Incompatibility on Render Deployment
+
+**Observed behavior:**
+The Docker image built and deployed successfully locally-equivalent 
+steps on Render, but the application crashed on startup with:
+`TypeError: ForwardRef._evaluate() missing 1 required keyword-only 
+argument: 'recursive_guard'`
+
+**Root cause:**
+The Dockerfile specified `FROM python:3.12-slim`, which pulls the 
+latest available Python 3.12.x patch release at build time. Render's 
+build pulled a newer patch (3.12.4+) than the Python 3.12.1 used in 
+the local Codespaces development environment. Python 3.12.4 made the 
+`recursive_guard` parameter to `typing.ForwardRef._evaluate()` 
+mandatory, which breaks Pydantic v1's internal forward-reference 
+resolution — and LlamaIndex 0.10.43 depends on Pydantic v1 
+internally for its instrumentation module. This is a documented, 
+widely-reported compatibility issue across the Pydantic and 
+LlamaIndex ecosystem, not specific to this project's code.
+
+**Fix applied:**
+Pinned the Dockerfile base image to the exact patch version 
+`python:3.12.3-slim` (the last known-compatible patch before the 
+breaking change), instead of the floating `python:3.12-slim` tag.
+
+**Lesson:**
+Floating version tags (e.g. `3.12-slim`) are convenient during 
+development but can introduce non-reproducible builds across 
+environments, since they may resolve to different patch versions 
+at different times or locations. Pinning exact versions in 
+production Dockerfiles is a more reliable practice, especially when 
+dependencies (like Pydantic v1 here) are sensitive to patch-level 
+language changes.
+
+---
+
+*Document version: 1.4 — June 2026*
