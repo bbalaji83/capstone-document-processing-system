@@ -226,6 +226,43 @@ A production deployment with budget for a larger model (e.g.
 see meaningfully improved consistency across all three areas, 
 at increased cost and latency per request.
 
+
 ---
 
-*Document version: 1.2 — June 2026*
+## 6. Local Docker Build Limited by Codespaces Disk Quota
+
+**Observed behavior:**
+Building the Docker image locally within GitHub Codespaces 
+(15GB storage quota) consistently failed at the final "export 
+to image" step with "no space left on device," even after 
+freeing up significant space by removing duplicate package 
+installations and unused conda environment.
+
+**Root cause:**
+The application's dependencies (particularly `torch` and 
+`sentence-transformers`) result in a large final Docker image. 
+Building and exporting this image requires substantial temporary 
+disk space beyond what remains available in a Codespaces 
+environment already running a development virtual environment 
+alongside the build process.
+
+**Resolution:**
+The Dockerfile was validated locally up through all build steps 
+(dependency installation, code copy, directory setup) — all 8 
+of 8 steps completed successfully every time, confirming the 
+Dockerfile itself is correct. Only the final disk export step 
+failed due to local storage constraints. The image build was 
+therefore deferred to Render's cloud build infrastructure, which 
+provides sufficient disk space, rather than attempting to build 
+and push a pre-built image from the local Codespace.
+
+**Lesson:**
+This reflects a real-world infrastructure consideration: local 
+development environments are not always sized for full container 
+builds of ML-dependent applications, and cloud-native build 
+pipelines (build-on-deploy) are a standard, appropriate solution 
+rather than a workaround.
+
+---
+
+*Document version: 1.3 — June 2026*
